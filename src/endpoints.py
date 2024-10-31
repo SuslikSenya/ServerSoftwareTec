@@ -3,7 +3,7 @@ from typing import List, Dict, Union
 
 from fastapi import FastAPI, HTTPException, APIRouter
 
-from src.models import User, Category, Record, UserCreate, CategoryCreate, CreateRecord
+from models import User, Category, Record, UserCreate, CategoryCreate, CreateRecord
 
 user_router = APIRouter(tags=['Users'], prefix='/user')
 category_router = APIRouter(tags=['Categories'], prefix='/category')

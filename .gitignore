@@ -1,4 +1,4 @@
 .idea/
 .venv/
 .gitignore
-docker-compose.yaml
+.test.py

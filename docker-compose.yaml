@@ -1,7 +1,5 @@
-version: '3'
-
 services:
-  lab1:
+  lab2:
     restart: always
     build:
       context: .
@@ -10,4 +8,4 @@ services:
       PORT: "8000"
     ports:
       - "8000:8000"
-    container_name: lab1
+    container_name: lab2
