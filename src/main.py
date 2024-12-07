@@ -3,7 +3,8 @@ import uvicorn
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from endpoints import user_router, record_router, category_router
+# from endpoints import user_router, record_router, category_router
+from test import user_router, db_router, record_router, category_router
 
 app = FastAPI(debug=True)
 
@@ -13,6 +14,7 @@ async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 app.include_router(user_router)
+app.include_router(db_router)
 app.include_router(category_router)
 app.include_router(record_router)
 
