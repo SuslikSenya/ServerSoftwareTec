@@ -57,7 +57,7 @@ class RecordModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     category_id = Column(Integer, ForeignKey("categories.id"))
-    date = Column(String)
+    date = Column(DateTime)
     amount = Column(Float)
 
     user = relationship("UserModel", back_populates="record")
