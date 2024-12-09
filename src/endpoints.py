@@ -113,7 +113,7 @@ async def create_transaction(transaction: TransactionCreate, session: AsyncSessi
 
 
 
-@user_router.get("/all_users")
+@user_router.get("/all_users/")
 async def get_all_users(session: AsyncSession = Depends(get_async_session)):
     result = await session.execute(select(UserModel))
     all_users = result.scalars().all()
