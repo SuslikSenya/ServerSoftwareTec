@@ -2,6 +2,7 @@ import json
 from typing import List, Dict, Union
 
 from fastapi import FastAPI, HTTPException, APIRouter, Depends, status
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +20,13 @@ record_router = APIRouter(tags=['Records'], prefix='/record')
 
 @db_router.post("/setup")
 async def setup_database():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        return {"message": "Database setup successful."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Database setup failed")
 
 
 '''
@@ -174,16 +179,23 @@ async def delete_record(record_id: int, session: AsyncSession = Depends(get_asyn
 
 @record_router.post("")
 async def create_record(record: CreateRecord, session: AsyncSession = Depends(get_async_session)):
-    new_record = RecordModel(
-        user_id=record.user_id,
-        category_id=record.category_id,
-        date=record.date,
-        amount=record.amount,
-    )
-    session.add(new_record)
-    await session.commit()
-    await session.refresh(new_record)
-    return {"Record": new_record}
+    try:
+        new_record = RecordModel(
+            user_id=record.user_id,
+            category_id=record.category_id,
+            date=record.date,
+            amount=record.amount,
+        )
+        session.add(new_record)
+        await session.commit()
+        await session.refresh(new_record)
+        return {"Record": new_record}
+    except ValidationError as ve:
+        raise HTTPException(status_code=400, detail=f"Validation error: {ve.errors()}")
+    except IntegrityError:
+        raise HTTPException(status_code=400, detail="Integrity error: invalid user or category id")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to create record")
 
 @record_router.get("")
 async def get_records(user_id: int = None, category_id: int = None, session: AsyncSession = Depends(get_async_session)):
@@ -191,9 +203,9 @@ async def get_records(user_id: int = None, category_id: int = None, session: Asy
         raise HTTPException(status_code=400, detail="Expected at least one parameter")
 
     query = select(RecordModel)
-    if user_id:
+    if user_id is not None:
         query = query.filter(RecordModel.user_id == user_id)
-    if category_id:
+    if category_id is not None:
         query = query.filter(RecordModel.category_id == category_id)
 
     result = await session.execute(query)
