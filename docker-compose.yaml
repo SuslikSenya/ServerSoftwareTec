@@ -1,11 +1,16 @@
 services:
-  lab2:
-    restart: always
+  app:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       PORT: "8000"
+      DATABASE_URL: "postgresql+asyncpg://sasha:NOV87CMvgEy7OKXP7kkOn0tgAUENFAeL@dpg-ctad51jtq21c73c3jvpg-a.oregon-postgres.render.com/lab3_au3f"  # Строка подключения к удаленной базе данных
     ports:
       - "8000:8000"
-    container_name: lab2
+    container_name: lab3
+    volumes:
+      - ./src:/src
+
+volumes:
+  postgresql_data:
