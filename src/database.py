@@ -3,14 +3,17 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 
-
-from config import DB_HOST, DB_NAME, DB_PASS, DB_PORT, DB_USER
-
-DATABASE_URL = f"sqlite+aiosqlite:///test.db"
+DATABASE_URL = f"sqlite+aiosqlite:///src/test.db"
 
 Base: DeclarativeMeta = declarative_base()
 
 engine = create_async_engine(DATABASE_URL)
+
+# from config import DB_CONNECTION
+#
+# Base: DeclarativeMeta = declarative_base()
+#
+# engine = create_async_engine(DB_CONNECTION)
 
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
