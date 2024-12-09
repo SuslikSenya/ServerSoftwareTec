@@ -179,23 +179,23 @@ async def delete_record(record_id: int, session: AsyncSession = Depends(get_asyn
 
 @record_router.post("")
 async def create_record(record: CreateRecord, session: AsyncSession = Depends(get_async_session)):
-    try:
-        new_record = RecordModel(
-            user_id=record.user_id,
-            category_id=record.category_id,
-            date=record.date,
-            amount=record.amount,
-        )
-        session.add(new_record)
-        await session.commit()
-        await session.refresh(new_record)
-        return {"Record": new_record}
-    except ValidationError as ve:
-        raise HTTPException(status_code=400, detail=f"Validation error: {ve.errors()}")
-    except IntegrityError:
-        raise HTTPException(status_code=400, detail="Integrity error: invalid user or category id")
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to create record")
+    # try:
+    new_record = RecordModel(
+        user_id=record.user_id,
+        category_id=record.category_id,
+        date=record.date,
+        amount=record.amount,
+    )
+    session.add(new_record)
+    await session.commit()
+    await session.refresh(new_record)
+    return {"Record": new_record}
+    # except ValidationError as ve:
+    #     raise HTTPException(status_code=400, detail=f"Validation error: {ve.errors()}")
+    # except IntegrityError:
+    #     raise HTTPException(status_code=400, detail="Integrity error: invalid user or category id")
+    # except Exception:
+    #     raise HTTPException(status_code=500, detail="Failed to create record")
 
 @record_router.get("")
 async def get_records(user_id: int = None, category_id: int = None, session: AsyncSession = Depends(get_async_session)):
