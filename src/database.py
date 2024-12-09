@@ -13,7 +13,7 @@ from config import DB_CONNECTION
 
 Base: DeclarativeMeta = declarative_base()
 
-engine = create_async_engine(DB_CONNECTION)
+engine = create_async_engine('postgresql+asyncpg://sasha:NOV87CMvgEy7OKXP7kkOn0tgAUENFAeL@dpg-ctad51jtq21c73c3jvpg-a.oregon-postgres.render.com/lab3_au3f')
 
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
