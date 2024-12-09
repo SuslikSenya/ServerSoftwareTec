@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Dict, Union
 
 from fastapi import FastAPI, HTTPException, APIRouter, Depends, status
@@ -40,6 +41,10 @@ record_router = APIRouter(tags=['Records'], prefix='/record')
 @user_router.post("", status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, session: AsyncSession = Depends(get_async_session)):
     try:
+        if not re.match(r'^[A-Za-z0-9]+$', user.name):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Username can only contain alphanumeric characters.")
+
         async with session.begin():
             new_user = UserModel(name=user.name)
             session.add(new_user)
@@ -92,24 +97,29 @@ async def delete_user(user_id: int, session: AsyncSession = Depends(get_async_se
 
 @user_router.post("/create_transaction", status_code=200)
 async def create_transaction(transaction: TransactionCreate, session: AsyncSession = Depends(get_async_session)):
-    async with session:
-        query = select(UserBillModel).filter(UserBillModel.user_name == transaction.user_name)
-        result = await session.execute(query)
-        user_bill = result.scalars().first()
-        if user_bill is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    try:
+        async with session:
+            query = select(UserBillModel).filter(UserBillModel.user_name == transaction.user_name)
+            result = await session.execute(query)
+            user_bill = result.scalars().first()
+            if user_bill is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        user_bill.amount_of_money += transaction.amount
-        new_transaction = TransactionModel(
-            user_name=transaction.user_name,
-            amount=transaction.amount,
-            timestamp=transaction.timestamp,
-            description=transaction.description
-        )
-        session.add(new_transaction)
-        await session.commit()
+            user_bill.amount_of_money += transaction.amount
+            new_transaction = TransactionModel(
+                user_name=transaction.user_name,
+                amount=transaction.amount,
+                timestamp=transaction.timestamp,
+                description=transaction.description
+            )
+            session.add(new_transaction)
+            await session.commit()
 
-    return transaction
+        return transaction
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 
@@ -155,11 +165,17 @@ async def delete_category(category_id: int, session: AsyncSession = Depends(get_
 
 @category_router.post("")
 async def create_category(category: CategoryCreate, session: AsyncSession = Depends(get_async_session)):
-    new_category = CategoryModel(name=category.name)
-    session.add(new_category)
-    await session.commit()
-    await session.refresh(new_category)
-    return {"message": "Category created successfully", "Category": new_category}
+    try:
+        if not category.name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name cannot be empty.")
+        new_category = CategoryModel(name=category.name)
+        session.add(new_category)
+        await session.commit()
+        await session.refresh(new_category)
+        return {"message": "Category created successfully", "Category": new_category}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 
 
 '''
@@ -191,23 +207,23 @@ async def delete_record(record_id: int, session: AsyncSession = Depends(get_asyn
 
 @record_router.post("")
 async def create_record(record: CreateRecord, session: AsyncSession = Depends(get_async_session)):
-    # try:
-    new_record = RecordModel(
-        user_id=record.user_id,
-        category_id=record.category_id,
-        date=record.date,
-        amount=record.amount,
-    )
-    session.add(new_record)
-    await session.commit()
-    await session.refresh(new_record)
-    return {"Record": new_record}
-    # except ValidationError as ve:
-    #     raise HTTPException(status_code=400, detail=f"Validation error: {ve.errors()}")
-    # except IntegrityError:
-    #     raise HTTPException(status_code=400, detail="Integrity error: invalid user or category id")
-    # except Exception:
-    #     raise HTTPException(status_code=500, detail="Failed to create record")
+    try:
+        new_record = RecordModel(
+            user_id=record.user_id,
+            category_id=record.category_id,
+            date=record.date,
+            amount=record.amount,
+        )
+        session.add(new_record)
+        await session.commit()
+        await session.refresh(new_record)
+        return {"Record": new_record}
+    except ValidationError as ve:
+        raise HTTPException(status_code=400, detail=f"Validation error: {ve.errors()}")
+    except IntegrityError:
+        raise HTTPException(status_code=400, detail="Integrity error: invalid user or category id")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to create record")
 
 @record_router.get("")
 async def get_records(user_id: int = None, category_id: int = None, session: AsyncSession = Depends(get_async_session)):
@@ -219,6 +235,9 @@ async def get_records(user_id: int = None, category_id: int = None, session: Asy
         query = query.filter(RecordModel.user_id == user_id)
     if category_id is not None:
         query = query.filter(RecordModel.category_id == category_id)
+
+    if not query:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User and category not found")
 
     result = await session.execute(query)
     filtered_records = result.scalars().all()
