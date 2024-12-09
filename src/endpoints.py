@@ -90,7 +90,7 @@ async def delete_user(user_id: int, session: AsyncSession = Depends(get_async_se
     return {'detail': f"User '{user_name}' was deleted successfully!"}
 
 
-@user_router.post("/create transaction", status_code=200)
+@user_router.post("/create_transaction", status_code=200)
 async def create_transaction(transaction: TransactionCreate, session: AsyncSession = Depends(get_async_session)):
     async with session:
         query = select(UserBillModel).filter(UserBillModel.user_name == transaction.user_name)
@@ -110,6 +110,18 @@ async def create_transaction(transaction: TransactionCreate, session: AsyncSessi
         await session.commit()
 
     return transaction
+
+
+
+@user_router.get("/all_users")
+async def get_all_users(session: AsyncSession = Depends(get_async_session)):
+    result = await session.execute(select(UserModel))
+    all_users = result.scalars().all()
+    print(all_users)
+    if not all_users:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Users not found")
+
+    return all_users
 
 
 '''
