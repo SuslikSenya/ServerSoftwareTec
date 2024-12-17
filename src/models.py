@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 
-from database import Base
+from .database import Base
 
 
 class UserModel(Base):
@@ -16,8 +16,6 @@ class UserModel(Base):
     bills = relationship("UserBillModel", back_populates="owner", cascade="all, delete-orphan")
     transactions = relationship("TransactionModel", back_populates="user", cascade="all, delete-orphan")
     record = relationship("RecordModel", back_populates="user", cascade="all, delete-orphan")
-
-
 
 
 class UserBillModel(Base):
@@ -51,7 +49,6 @@ class CategoryModel(Base):
     record = relationship("RecordModel", back_populates="category", cascade="all, delete-orphan")
 
 
-
 class RecordModel(Base):
     __tablename__ = "records"
 
@@ -63,4 +60,3 @@ class RecordModel(Base):
 
     user = relationship("UserModel", back_populates="record")
     category = relationship("CategoryModel", back_populates="record")
-
