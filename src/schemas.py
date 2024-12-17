@@ -3,8 +3,14 @@ from typing import List, Optional
 from datetime import datetime
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
 class UserCreate(BaseModel):
     name: str
+    password: bytes
 
 
 class User(UserCreate):
@@ -25,6 +31,7 @@ class TransactionCreate(BaseModel):
     amount: int
     description: str
     timestamp: datetime
+
 
 class Transaction(TransactionCreate):
     id: int
