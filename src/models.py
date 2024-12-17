@@ -11,6 +11,7 @@ class UserModel(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True)
+    password = Column(String(255))
 
     bills = relationship("UserBillModel", back_populates="owner", cascade="all, delete-orphan")
     transactions = relationship("TransactionModel", back_populates="user", cascade="all, delete-orphan")
