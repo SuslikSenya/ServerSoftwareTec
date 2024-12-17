@@ -19,6 +19,7 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from src.database import Base
+from src.models import UserModel, UserBillModel, TransactionModel, RecordModel, CategoryModel
 from src.config import DB_CONNECTION
 target_metadata = Base.metadata
 
