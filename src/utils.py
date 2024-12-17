@@ -3,7 +3,6 @@ from datetime import timedelta, datetime
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
-from jwt import encode, decode, exceptions
 from passlib.context import CryptContext
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
