@@ -3,8 +3,8 @@ import uvicorn
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-# from endpoints import user_router, record_router, category_router
 from endpoints import user_router, db_router, record_router, category_router
+# from test import user_router, db_router, record_router, category_router
 
 app = FastAPI(debug=True)
 
