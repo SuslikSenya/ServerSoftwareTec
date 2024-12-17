@@ -1,33 +1,53 @@
-import json
 import re
-from typing import List, Dict, Union
+from typing import Dict
 
-from fastapi import FastAPI, HTTPException, APIRouter, Depends, status
-from pydantic import ValidationError
+from fastapi import FastAPI, HTTPException, APIRouter, Depends, status, Security
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, OAuth2
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import engine, Base, get_async_session
-from schemas import User, UserBill, UserCreate, TransactionCreate, Transaction, CategoryCreate, CreateRecord
+from database import get_async_session, Base, engine
+from schemas import Token, User, UserBill, UserCreate, TransactionCreate, Transaction, CategoryCreate, CreateRecord
 from models import UserModel, UserBillModel, TransactionModel, CategoryModel, RecordModel
 
+from datetime import timedelta
+
+from utils import authenticate_user, create_access_token, verify_password, get_password_hash, get_current_user
+
 user_router = APIRouter(tags=['Users'], prefix='/user')
-db_router = APIRouter(tags=['DB START'], prefix='/db')
+db_router = APIRouter(tags=['DB START'], prefix='/admin')
 category_router = APIRouter(tags=['Categories'], prefix='/category')
 record_router = APIRouter(tags=['Records'], prefix='/record')
 
 
+'''
 
-# @db_router.post("/setup")
-# async def setup_database():
-#     try:
-#         async with engine.begin() as conn:
-#             await conn.run_sync(Base.metadata.drop_all)
-#             await conn.run_sync(Base.metadata.create_all)
-#         return {"message": "Database setup successful."}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail="Database setup failed")
+##   ADMIN
+
+'''
+
+
+@db_router.post("/setup/")
+async def setup_database():
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        return {"message": "Database setup successful."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Database setup failed")
+
+
+@db_router.get("/all_users/")
+async def get_all_users(session: AsyncSession = Depends(get_async_session)):
+    result = await session.execute(select(UserModel))
+    all_users = result.scalars().all()
+    if not all_users:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Users not found")
+
+    return all_users
 
 
 '''
@@ -37,16 +57,33 @@ record_router = APIRouter(tags=['Records'], prefix='/record')
 '''
 
 
+@user_router.post("/login")
+async def login_user(
+        form_data: OAuth2PasswordRequestForm = Depends(),
+        session: AsyncSession = Depends(get_async_session)
+):
+    login_user = await authenticate_user(user_name=form_data.username, password=form_data.password, session=session)
 
-@user_router.post("", status_code=status.HTTP_201_CREATED)
+    if not login_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid credentials")
+    if not verify_password(form_data.password, login_user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    access_token_expire = timedelta(minutes=30)
+    access_token = create_access_token(data={"sub": login_user.name}, expires_delta=access_token_expire)
+    return {"access_token": access_token, "token_type": "bearer", "user": login_user.name}
+
+
+@user_router.post("/register/", status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, session: AsyncSession = Depends(get_async_session)):
     try:
         if not re.match(r'^[A-Za-z0-9]+$', user.name):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Username can only contain alphanumeric characters.")
 
+        hashed_password = get_password_hash(user.password)
+
         async with session.begin():
-            new_user = UserModel(name=user.name)
+            new_user = UserModel(name=user.name, password=hashed_password)
             session.add(new_user)
             await session.flush()
 
@@ -65,20 +102,40 @@ async def create_user(user: UserCreate, session: AsyncSession = Depends(get_asyn
 
 
 @user_router.get("/{user_id}")
-async def get_user(user_id: int, session: AsyncSession = Depends(get_async_session)):
+async def get_user_by_id(
+        user_id: int,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized"
+        )
     query = select(UserModel).filter(UserModel.id == user_id)
     result = await session.execute(query)
     user = result.scalars().first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
     query_bill = select(UserBillModel).filter(UserBillModel.user_name == user.name)
     result_bill = await session.execute(query_bill)
     user_bill = result_bill.scalars().first()
+
     return {"id": user.id, "name": user.name, "user_bill": user_bill.amount_of_money}
 
 
 @user_router.delete("/{user_id}")
-async def delete_user(user_id: int, session: AsyncSession = Depends(get_async_session)):
+async def delete_user(
+        user_id: int,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized"
+        )
     query = select(UserModel).filter(UserModel.id == user_id)
     result = await session.execute(query)
     user = result.scalars().first()
@@ -95,8 +152,17 @@ async def delete_user(user_id: int, session: AsyncSession = Depends(get_async_se
     return {'detail': f"User '{user_name}' was deleted successfully!"}
 
 
-@user_router.post("/create_transaction", status_code=200)
-async def create_transaction(transaction: TransactionCreate, session: AsyncSession = Depends(get_async_session)):
+@user_router.post("/create_transaction/", status_code=200)
+async def create_transaction(
+        transaction: TransactionCreate,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized"
+        )
     try:
         async with session:
             query = select(UserBillModel).filter(UserBillModel.user_name == transaction.user_name)
@@ -122,18 +188,6 @@ async def create_transaction(transaction: TransactionCreate, session: AsyncSessi
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-
-@user_router.get("/all_users/")
-async def get_all_users(session: AsyncSession = Depends(get_async_session)):
-    result = await session.execute(select(UserModel))
-    all_users = result.scalars().all()
-    print(all_users)
-    if not all_users:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Users not found")
-
-    return all_users
-
-
 '''
 
 ##   CATEGORY
@@ -142,7 +196,16 @@ async def get_all_users(session: AsyncSession = Depends(get_async_session)):
 
 
 @category_router.get("/{category_id}", status_code=200)
-async def get_category(category_id: int, session: AsyncSession = Depends(get_async_session)) -> str:
+async def get_category(
+        category_id: int,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+) -> str:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
+
     query = select(CategoryModel).filter(CategoryModel.id == category_id)
     result = await session.execute(query)
     category = result.scalars().first()
@@ -152,7 +215,15 @@ async def get_category(category_id: int, session: AsyncSession = Depends(get_asy
 
 
 @category_router.delete("/{category_id}", status_code=201)
-async def delete_category(category_id: int, session: AsyncSession = Depends(get_async_session)) -> Dict[str, str]:
+async def delete_category(
+        category_id: int,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+) -> Dict[str, str]:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
     query = select(CategoryModel).filter(CategoryModel.id == category_id)
     result = await session.execute(query)
     category = result.scalars().first()
@@ -164,7 +235,15 @@ async def delete_category(category_id: int, session: AsyncSession = Depends(get_
 
 
 @category_router.post("")
-async def create_category(category: CategoryCreate, session: AsyncSession = Depends(get_async_session)):
+async def create_category(
+        category: CategoryCreate,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
     try:
         if not category.name:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name cannot be empty.")
@@ -177,7 +256,6 @@ async def create_category(category: CategoryCreate, session: AsyncSession = Depe
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-
 '''
 
 ##   RECORD
@@ -186,7 +264,15 @@ async def create_category(category: CategoryCreate, session: AsyncSession = Depe
 
 
 @record_router.get("/{record_id}")
-async def get_record(record_id: int, session: AsyncSession = Depends(get_async_session)):
+async def get_record(
+        record_id: int,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
     query = select(RecordModel).filter(RecordModel.id == record_id)
     result = await session.execute(query)
     record = result.scalars().first()
@@ -194,8 +280,17 @@ async def get_record(record_id: int, session: AsyncSession = Depends(get_async_s
         raise HTTPException(status_code=404, detail="Record not found")
     return record
 
+
 @record_router.delete("/{record_id}")
-async def delete_record(record_id: int, session: AsyncSession = Depends(get_async_session)):
+async def delete_record(
+        record_id: int,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
     query = select(RecordModel).filter(RecordModel.id == record_id)
     result = await session.execute(query)
     record = result.scalars().first()
@@ -205,8 +300,17 @@ async def delete_record(record_id: int, session: AsyncSession = Depends(get_asyn
         return {"message": "Record deleted successfully!"}
     raise HTTPException(status_code=404, detail="Record not found")
 
+
 @record_router.post("")
-async def create_record(record: CreateRecord, session: AsyncSession = Depends(get_async_session)):
+async def create_record(
+        record: CreateRecord,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
     try:
         new_record = RecordModel(
             user_id=record.user_id,
@@ -225,8 +329,18 @@ async def create_record(record: CreateRecord, session: AsyncSession = Depends(ge
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to create record")
 
+
 @record_router.get("")
-async def get_records(user_id: int = None, category_id: int = None, session: AsyncSession = Depends(get_async_session)):
+async def get_records(
+        user_id: int = None,
+        category_id: int = None,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: str = Depends(get_current_user)
+):
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized")
     if user_id is None and category_id is None:
         raise HTTPException(status_code=400, detail="Expected at least one parameter")
 
@@ -236,7 +350,7 @@ async def get_records(user_id: int = None, category_id: int = None, session: Asy
     if category_id is not None:
         query = query.filter(RecordModel.category_id == category_id)
 
-    if not query:
+    if query is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User and category not found")
 
     result = await session.execute(query)
@@ -245,4 +359,3 @@ async def get_records(user_id: int = None, category_id: int = None, session: Asy
     if filtered_records:
         return filtered_records
     raise HTTPException(status_code=404, detail="No records found")
-
