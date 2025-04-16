@@ -9,15 +9,18 @@ from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 #
 # engine = create_async_engine(DATABASE_URL)
 
-# from config import DB_CONNECTION
+from .config import DB_CONNECTION
 
 Base: DeclarativeMeta = declarative_base()
 
-engine = create_async_engine('postgresql+asyncpg://sasha:NOV87CMvgEy7OKXP7kkOn0tgAUENFAeL@dpg-ctad51jtq21c73c3jvpg-a.oregon-postgres.render.com/lab3_au3f')
-
-
+engine = create_async_engine(
+    DB_CONNECTION,
+    pool_pre_ping=True,
+    pool_recycle=1800
+)
 
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:

@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     environment:
       PORT: "8000"
-      DATABASE_URL: "postgresql+asyncpg://sasha:NOV87CMvgEy7OKXP7kkOn0tgAUENFAeL@dpg-ctad51jtq21c73c3jvpg-a.oregon-postgres.render.com/lab3_au3f"
+      DATABASE_URL: "postgresql+asyncpg://sasha:Tsa0zS5iXO1Y6xyfvJXtDCVAcUuZAqQ6@dpg-cvdvtpnnoe9s73ejduvg-a.oregon-postgres.render.com/test_xaa1"
     ports:
       - "8000:8000"
     container_name: lab3

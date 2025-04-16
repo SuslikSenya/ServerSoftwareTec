@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 
-from database import Base
+from .database import Base
 
 
 class UserModel(Base):
@@ -16,6 +16,9 @@ class UserModel(Base):
     bills = relationship("UserBillModel", back_populates="owner", cascade="all, delete-orphan")
     transactions = relationship("TransactionModel", back_populates="user", cascade="all, delete-orphan")
     record = relationship("RecordModel", back_populates="user", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<UserModel(id={self.id}, name={self.name})>"
 
 
 class UserBillModel(Base):

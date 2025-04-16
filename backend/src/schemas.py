@@ -10,11 +10,15 @@ class Token(BaseModel):
 
 class UserCreate(BaseModel):
     name: str
-    password: bytes
+    password: str
 
 
 class User(UserCreate):
     id: int
+
+
+class LoginUser(UserCreate):
+    password: str
 
 
 class UserBillCreate(BaseModel):

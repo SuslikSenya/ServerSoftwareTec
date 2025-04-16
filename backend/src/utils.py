@@ -7,8 +7,8 @@ from passlib.context import CryptContext
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_async_session
-from models import UserModel
+from .database import get_async_session
+from .models import UserModel
 
 SECRET_KEY = "b3b1e53b10c1f2f5c78b21435d1aaf6e1d4f9a4cbe1b2a0b65e1cb29e4b05e65"
 ALGORITHM = "HS256"
@@ -17,7 +17,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Security utilities
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
-
 
 
 def verify_password(plain_password, hashed_password):
@@ -73,4 +72,4 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: AsyncSe
     if user is None:
         raise credentials_exception
 
-    return user.name
+    return user
