@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI CRUD</title>
+</head>
+<body>
+    <h1>Регистрация и Авторизация</h1>
+
+    <h2>Регистрация</h2>
+    <input type="text" id="registerUsername" placeholder="Имя пользователя">
+    <input type="password" id="registerPassword" placeholder="Пароль">
+    <button onclick="registerUser()">Зарегистрироваться</button>
+
+    <h2>Вход</h2>
+    <input type="text" id="loginUsername" placeholder="Имя пользователя">
+    <input type="password" id="loginPassword" placeholder="Пароль">
+    <button onclick="loginUser()">Войти</button>
+
+    <h2>Транзакции</h2>
+    <input type="text" id="transactionUser" placeholder="Имя пользователя">
+    <input type="number" id="transactionAmount" placeholder="Сумма">
+    <input type="text" id="transactionDesc" placeholder="Описание">
+    <button onclick="createTransaction()">Создать транзакцию</button>
+
+    <h2>Категории</h2>
+    <button onclick="getCategories()">Показать категории</button>
+    <ul id="categoryList"></ul>
+
+    <script>
+        const apiUrl = "http://127.0.0.1:8000";
+
+        async function registerUser() {
+            const username = document.getElementById("registerUsername").value;
+            const password = document.getElementById("registerPassword").value;
+
+            const response = await fetch(`${apiUrl}/user/register/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: username, password })
+            });
+
+            const data = await response.json();
+            alert(data.detail || "Пользователь зарегистрирован!");
+        }
+
+        async function loginUser() {
+            const formData = new URLSearchParams();
+            formData.append("username", document.getElementById("loginUsername").value);
+            formData.append("password", document.getElementById("loginPassword").value);
+
+            const response = await fetch(`${apiUrl}/user/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.access_token) {
+                localStorage.setItem("token", data.access_token);
+                alert("Успешный вход!");
+            } else {
+                alert(data.detail || "Ошибка входа!");
+            }
+        }
+
+        async function createTransaction() {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                alert("Сначала войдите в систему!");
+                return;
+            }
+
+            const user = document.getElementById("transactionUser").value;
+            const amount = document.getElementById("transactionAmount").value;
+            const description = document.getElementById("transactionDesc").value;
+            const timestamp = new Date().toISOString(); // Текущая дата и время
+
+            const response = await fetch(`${apiUrl}/user/create_transaction/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ user_name: user, amount: parseFloat(amount), description, timestamp })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert("Транзакция создана!");
+            } else {
+                alert(data.detail || "Ошибка при создании транзакции!");
+            }
+        }
+
+        async function getCategories() {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                alert("Сначала войдите в систему!");
+                return;
+            }
+
+            const response = await fetch(`${apiUrl}/category/1`, {
+                method: "GET",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById("categoryList").innerHTML = `<li>${data}</li>`;
+            } else {
+                alert(data.detail || "Ошибка загрузки категорий!");
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "8000"
+      DATABASE_URL: "postgresql+asyncpg://sasha:Tsa0zS5iXO1Y6xyfvJXtDCVAcUuZAqQ6@dpg-cvdvtpnnoe9s73ejduvg-a.oregon-postgres.render.com/test_xaa1"
+    ports:
+      - "8000:8000"
+    container_name: lab3
+    volumes:
+      - ./src:/src
+
+volumes:
+  postgresql_data:
